@@ -78,21 +78,21 @@ param = [
 :demet_rate => 0.015
 ]
 
-# u0 = vcat(
-#     [um[i] => 1 for i in 1:histone_nr],
-#     [m[i] => 2 for i in 1:histone_nr],
-#     [rna_pol[i] => 3 for i in 1:histone_nr],
-#     [setd2[i] => 4 for i in 1:histone_nr])
+u0 = vcat(
+    [um[i] => 1 for i in 1:histone_nr],
+    [m[i] => 2 for i in 1:histone_nr],
+    [rna_pol[i] => 3 for i in 1:histone_nr],
+    [setd2[i] => 4 for i in 1:histone_nr])
 
-# tspan = (0.0, 0.1)
-# jinput = JumpInputs(auto_methylation, u0, tspan, param)
-# jprob = JumpProcesses.JumpProblem(jinput)
-# sol = solve(jprob, JumpProcesses.SSAStepper())
-# start_pos = sol.u[1]
-# um_index = findall(x -> x == 1, start_pos)
-# m_index = findall(x -> x == 2, start_pos)
-# rna_pol_index = findall(x -> x == 3, start_pos)
-# setd2_index = findall(x -> x == 4, start_pos)
+tspan = (0.0, 0.1)
+jinput = JumpInputs(auto_methylation, u0, tspan, param)
+jprob = JumpProcesses.JumpProblem(jinput)
+sol = solve(jprob, JumpProcesses.SSAStepper())
+start_pos = sol.u[1]
+um_index = findall(x -> x == 1, start_pos)
+m_index = findall(x -> x == 2, start_pos)
+rna_pol_index = findall(x -> x == 3, start_pos)
+setd2_index = findall(x -> x == 4, start_pos)
 
 u0 = vcat(
     [um[i] => 1 for i in 1:histone_nr],
