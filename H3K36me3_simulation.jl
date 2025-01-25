@@ -16,79 +16,52 @@ histone_nr = 20
 gene1_start = 5
 gene1_end = 15
 
-# unmethylated
+# unmethylated histones
 @species um(t)[1:histone_nr]
 
-# unmethylated + RNA POLII bound
-@species um_rna(t)[1:histone_nr]
-
-# unmethylated + RNA POL II bound + SETD2 bound
-@species um_rna_setd2(t)[1:histone_nr]
-
-# unmethylated + kdm4a bound
-@species um_kdm4a(t)[1:histone_nr]
-
-# methylated
+# methylated histones
 @species m(t)[1:histone_nr]
 
-# methylated + RNA POLII bound
-@species m_rna(t)[1:histone_nr]
+# RNA POLII location(s)
+@species rna_pol(t)[1:histone_nr]
 
-# methylated + RNA POL II bound + SETD2 bound
-@species m_rna_setd2(t)[1:histone_nr]
-
-# methylated + KDM4A
-@species m_kdm4a(t)[1:histone_nr]
+# SETD2 location(s)
+@species setd2(t)[1:histone_nr]
 
 
-@parameters rna_poll_bind, setd2_bind, kdm4a_bind
-@parameters rna_poll_diss, setd2_diss, rna_poll_setd2_diss, kdm4a_diss 
-@parameters met_rate, rna_pol_sliding, unmet_rate
+
+@parameters rna_pol_bind, setd2_bind
+@parameters rna_pol_diss, setd2_diss 
+@parameters met_rate, rna_pol_sliding, demet_rate
 
 rxs = []
 
-
-######## Later add restriction to be binary only ########
-# It's probably fine like it is
-# ifelse($m_rna[gene1_start] == 1 | $m_rna_setd2[gene1_start] == 1, 0, 1)
-########## end ###############
-
-
 # Add binding of rna pol 2
-append!(rxs, [(@reaction rna_poll_bind, $(m[gene1_start]) --> $(m_rna[gene1_start]))])
-append!(rxs, [(@reaction rna_poll_bind, $(um[gene1_start]) --> $(um_rna[gene1_start]))])
+append!(rxs, [(@reaction rna_pol_bind * (1-$(rna_pol[gene1_start])), 0 --> $(rna_pol[gene1_start]))])
 # Add binding of setd2
-append!(rxs, [(@reaction setd2_bind, $(m_rna[i]) --> $(m_rna_setd2[i])) for i in gene1_start:gene1_end])
-append!(rxs, [(@reaction setd2_bind, $(um_rna[i]) --> $(um_rna_setd2[i])) for i in gene1_start:gene1_end])
-# Add binding of kdm4a
-append!(rxs, [(@reaction kdm4a_bind, $(m[i]) --> $(m_kdm4a[i])) for i in gene1_start:gene1_end])
+append!(rxs, [(@reaction setd2_bind  * $(rna_pol[i]) * (1-$(setd2[i])), 0 --> $(setd2[i])) for i in gene1_start:gene1_end])
 
-# Add sliding of rna pol 2
-append!(rxs, [@reaction rna_pol_sliding, $(m_rna[i]) --> $(m_rna[i+1]) for i in gene1_start:gene1_end-1])
-append!(rxs, [@reaction rna_pol_sliding, $(um_rna[i]) --> $(um_rna[i+1]) for i in gene1_start:gene1_end-1])
-# Add sliding of rna pol 2 + setd2
-append!(rxs, [@reaction rna_pol_sliding, $(m_rna_setd2[i]) --> $(m_rna_setd2[i+1]) for i in gene1_start:gene1_end-1])
-append!(rxs, [@reaction rna_pol_sliding, $(um_rna_setd2[i]) --> $(um_rna_setd2[i+1]) for i in gene1_start:gene1_end-1])
+
+# Add sliding of rna pol 2 (no setd2 bound)
+append!(rxs, [@reaction rna_pol_sliding * (1-$(setd2[i])) * (1-$(rna_pol[i+1])), $(rna_pol[i]) --> $(rna_pol[i+1]) for i in gene1_start:gene1_end-1])
+# Add sliding of rna pol 2 (with setd2 bound)
+append!(rxs, [@reaction rna_pol_sliding * $(setd2[i]) * (1-$(rna_pol[i+1])), $(rna_pol[i]) + $(setd2[i]) --> $(rna_pol[i+1]) + $(setd2[i+1]) for i in gene1_start:gene1_end-1])
+
 
 # Add setd2 methylation
-append!(rxs, [(@reaction met_rate, $(um_rna_setd2[i]) --> $(m_rna_setd2[i])) for i in gene1_start:gene1_end])
+append!(rxs, [(@reaction met_rate * $(um[i]) * $(setd2[i]), $(um[i]) --> $(m[i])) for i in gene1_start:gene1_end])
 # Add kdm4a demethylation
-append!(rxs, [(@reaction unmet_rate, $(m_kdm4a[i]) --> $(um_kdm4a[i])) for i in gene1_start:gene1_end])
+append!(rxs, [(@reaction demet_rate * $(m[i]) * (1-$(rna_pol[i])), $(m[i]) --> $(um[i])) for i in gene1_start:gene1_end])
 
-# Add dissociation of rna pol 2
-append!(rxs, [(@reaction rna_poll_diss, $(m_rna[gene1_end]) --> $(m[gene1_end]))])
-append!(rxs, [(@reaction rna_poll_diss, $(um_rna[gene1_end]) --> $(um[gene1_end]))])
+
+# Add dissociation of rna pol 2 (with setd2 bound)
+append!(rxs, [(@reaction rna_pol_diss * (1-$(setd2[gene1_end])), $(rna_pol[gene1_end]) --> 0)])
+# Add dissociation of rna pol 2 (no setd2 bound)
+append!(rxs, [(@reaction rna_pol_diss * $(setd2[gene1_end]), $(rna_pol[gene1_end]) + $(setd2[gene1_end]) --> 0)])
+
+
 # Add dissociation of setd2
-append!(rxs, [(@reaction setd2_diss, $(m_rna_setd2[i]) --> $(m_rna[i])) for i in gene1_start:gene1_end])
-append!(rxs, [(@reaction setd2_diss, $(um_rna_setd2[i]) --> $(um_rna[i])) for i in gene1_start:gene1_end])
-# Add dissociation of rna pol 2 + setd2
-append!(rxs, [(@reaction rna_poll_setd2_diss, $(m_rna_setd2[gene1_end]) --> $(m[gene1_end]))])
-append!(rxs, [(@reaction rna_poll_setd2_diss, $(um_rna_setd2[gene1_end]) --> $(um[gene1_end]))])
-# Add dissociation of kdm4a
-append!(rxs, [(@reaction kdm4a_diss, $(um_kdm4a[i]) --> $(um[i])) for i in gene1_start:gene1_end])
-
-# I feel like rna pol 2 is able to slide on a nucleosome while kdm4a is bound. And kdm4a is able to bind while rna pol 2 is bound
-# And two rna pol 2 can be on top of each other.
+append!(rxs, [(@reaction setd2_diss, $(setd2[i]) --> 0) for i in gene1_start:gene1_end])
 
 
 @named auto_methylation = ReactionSystem(rxs, t)
@@ -96,52 +69,38 @@ auto_methylation = complete(auto_methylation)
 
 
 param = [
-:rna_poll_bind => 0.20,
-:setd2_bind => 0.65,
-:kdm4a_bind => 0.10,
-:rna_poll_diss => 0.65,
-:setd2_diss => 0.05,
-:rna_poll_setd2_diss => 0.65, 
-:kdm4a_diss => 0.7, 
-:met_rate => 0.9,
-:rna_pol_sliding => 0.35,
-:unmet_rate => 0.4
+:rna_pol_bind => 0.05,
+:setd2_bind => 0.40,
+:rna_pol_diss => 0.40,
+:setd2_diss => 0.005,
+:met_rate => 0.80,
+:rna_pol_sliding => 0.20,
+:demet_rate => 0.015
 ]
 
 # u0 = vcat(
-#     [um[i] => 1 for i in 1:histone_nr],    
-#     [um_rna[i] => 2 for i in 1:histone_nr],
-#     [um_rna_setd2[i] => 3 for i in 1:histone_nr],
-#     [um_kdm4a[i] => 4 for i in 1:histone_nr],
-#     [m[i] => 5 for i in 1:histone_nr],
-#     [m_rna[i] => 6 for i in 1:histone_nr],
-#     [m_rna_setd2[i] => 7 for i in 1:histone_nr],
-#     [m_kdm4a[i] => 8 for i in 1:histone_nr])
+#     [um[i] => 1 for i in 1:histone_nr],
+#     [m[i] => 2 for i in 1:histone_nr],
+#     [rna_pol[i] => 3 for i in 1:histone_nr],
+#     [setd2[i] => 4 for i in 1:histone_nr])
+
 # tspan = (0.0, 0.1)
 # jinput = JumpInputs(auto_methylation, u0, tspan, param)
 # jprob = JumpProcesses.JumpProblem(jinput)
 # sol = solve(jprob, JumpProcesses.SSAStepper())
 # start_pos = sol.u[1]
 # um_index = findall(x -> x == 1, start_pos)
-# um_rna_index = findall(x -> x == 2, start_pos)
-# um_rna_setd2_index = findall(x -> x == 3, start_pos)
-# um_kdm4a_index = findall(x -> x == 4, start_pos)
-# m_index = findall(x -> x == 5, start_pos)
-# m_rna_index = findall(x -> x == 6, start_pos)
-# m_rna_setd2_index = findall(x -> x == 7, start_pos)
-# m_kdm4a_index = findall(x -> x == 8, start_pos)
+# m_index = findall(x -> x == 2, start_pos)
+# rna_pol_index = findall(x -> x == 3, start_pos)
+# setd2_index = findall(x -> x == 4, start_pos)
 
 u0 = vcat(
-    [um[i] => 1 for i in 1:histone_nr],    
-    [um_rna[i] => 0 for i in 1:histone_nr],
-    [um_rna_setd2[i] => 0 for i in 1:histone_nr],
-    [um_kdm4a[i] => 0 for i in 1:histone_nr],
+    [um[i] => 1 for i in 1:histone_nr],
     [m[i] => 0 for i in 1:histone_nr],
-    [m_rna[i] => 0 for i in 1:histone_nr],
-    [m_rna_setd2[i] => 0 for i in 1:histone_nr],
-    [m_kdm4a[i] => 0 for i in 1:histone_nr])
+    [rna_pol[i] => 0 for i in 1:histone_nr],
+    [setd2[i] => 0 for i in 1:histone_nr])
 
-tspan = (0.0, 1000)
+tspan = (0.0, 2000)
 
 jinput = JumpInputs(auto_methylation, u0, tspan, param)
 jprob = JumpProcesses.JumpProblem(jinput)
@@ -149,14 +108,55 @@ sol = solve(jprob, JumpProcesses.SSAStepper())
 
 changes_over_time = transpose(hcat(sol.u...))
 
-um_over_time = changes_over_time[:, um_index]
-um_rna_over_time = changes_over_time[:, um_rna_index]
-um_rna_setd2_over_time = changes_over_time[:, um_rna_setd2_index]
-um_kdm4a_over_time = changes_over_time[:, um_kdm4a_index]
-m_over_time = changes_over_time[:, m_index]
-m_rna_over_time = changes_over_time[:, m_rna_index]
-m_rna_setd2_over_time = changes_over_time[:, m_rna_setd2_index]
-m_kdm4a_over_time = changes_over_time[:, m_kdm4a_index]
+um_index_over_time = changes_over_time[:, um_index]
+m_index_over_time = changes_over_time[:, m_index]
+rna_pol_index_over_time = changes_over_time[:, rna_pol_index]
+setd2_index_over_time = changes_over_time[:, setd2_index]
 
 print(start_pos)
 
+t_max = 1:300
+
+#plot(sol.t, m_index_over_time)
+
+
+# heatmap(
+#     m_index_over_time[t_max,:] .|
+#     (rna_pol_index_over_time[t_max,:] .<< 1) .|
+#     (setd2_index_over_time[t_max,:] .<< 2),
+#     color = cgrad([:lightblue,  # Non-methylated    |   Nothing bound
+#             :lightgreen,        # Methylated        |   Nothing bound
+#             :orange,            # Non-methylated    |   RNA POLII bound
+#             :olive,             # Methylated        |   RNA POLII bound
+#             :black,             # Non-methyalted    |   SETD2 bound (NOT possible)
+#             :black,             # Methylated        |   SETD2 bound (NOT possible)
+#             :red,               # Non-methylated    |   RNA POLII + SETD2 bound
+#             :darkgoldenrod      # Methylated        |   RNA POLII + SETD2 bound
+#             ])
+# )
+
+heatmap(
+    m_index_over_time[t_max,:] .|
+    (rna_pol_index_over_time[t_max,:] .<< 1) .|
+    (setd2_index_over_time[t_max,:] .<< 2),
+    color = cgrad([:lightblue,  # Non-methylated    |   Nothing bound
+            :olivedrab,         # Methylated        |   Nothing bound
+            :sienna2,           # Non-methylated    |   RNA POLII bound
+            :sienna2,           # Methylated        |   RNA POLII bound
+            :black,             # Non-methyalted    |   SETD2 bound (NOT possible)
+            :black,             # Methylated        |   SETD2 bound (NOT possible)
+            :brown3,            # Non-methylated    |   RNA POLII + SETD2 bound
+            :brown3             # Methylated        |   RNA POLII + SETD2 bound
+            ])
+)
+
+
+m_index_over_time
+
+
+# bitwise comparison of binary matrices
+# t1 = [0 1 0 1 ; 0 1 0 1]
+# t2 = [0 0 1 1 ; 0 0 1 1]
+# t3 = [0 0 0 0 ; 1 1 1 1]
+
+# t1 .| (t2 .<< 1) .| (t3 .<< 2)
